@@ -1,0 +1,67 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Load the dataset
+df = pd.read_csv('d:/Users/ΠΑΥΛΟΣ/OneDrive/Desktop/Agrofood_co2_emission.csv')  # Replace 'your_dataset.csv' with the actual path to your dataset file
+
+# Data preprocessing
+# Select relevant features for clustering
+features = ['Urban population', 'total_emission']
+
+# Drop rows with missing values and select relevant features
+df_clustering = df.dropna(subset=features)[features]
+
+# Normalize the data (scaling to [0, 1])
+df_normalized = (df_clustering - df_clustering.min()) / (df_clustering.max() - df_clustering.min())
+
+# Number of clusters
+k = 4
+
+# Initialize centroids randomly
+centroids = df_normalized.sample(n=k, random_state=42)
+
+# Assign each data point to the nearest centroid
+def assign_clusters(df, centroids):
+    distances = np.sqrt(((df.values - centroids.iloc[0].values)**2).sum(axis=1))
+    clusters = [0] * len(df)
+    for i in range(1, len(centroids)):
+        new_distances = np.sqrt(((df.values - centroids.iloc[i].values)**2).sum(axis=1))
+        for j in range(len(df)):
+            if new_distances[j] < distances[j]:
+                distances[j] = new_distances[j]
+                clusters[j] = i
+    return clusters
+
+# Update centroids based on mean of data points in each cluster
+def update_centroids(df, clusters):
+    new_centroids = pd.DataFrame(columns=df.columns)
+    for i in range(len(np.unique(clusters))):
+        cluster_points = df.iloc[np.where(np.array(clusters) == i)]
+        new_centroids.loc[i] = cluster_points.mean()
+    return new_centroids
+
+# Perform K-means clustering
+max_iterations = 100
+for _ in range(max_iterations):
+    clusters = assign_clusters(df_normalized, centroids)
+    new_centroids = update_centroids(df_normalized, clusters)
+    if (new_centroids.values == centroids.values).all():
+        break
+    centroids = new_centroids
+
+# Add cluster labels to the dataframe
+df_clustering['Cluster'] = clusters
+
+# Visualize clusters
+colors = ['blue', 'green', 'red', 'purple']
+plt.figure(figsize=(12, 8))
+for i in range(k):
+    plt.scatter(df_clustering.loc[df_clustering['Cluster'] == i, 'Urban population'],
+                df_clustering.loc[df_clustering['Cluster'] == i, 'total_emission'],
+                color=colors[i], label=f'Cluster {i}')
+plt.xlabel('Urban Population')
+plt.ylabel('Total Emission')
+plt.title('K-means Clustering')
+plt.legend()
+plt.show()
